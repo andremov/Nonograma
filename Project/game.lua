@@ -7,6 +7,7 @@ module(..., package.seeall)
 
 local dimension -- BETWEEN 5 AND 10
 local preStartMenuGroup
+local playingMenuGroup
 local boardGroup
 local board
 local solution
@@ -34,7 +35,7 @@ function initPreUI()
 	startBtn.x=midW
 	startBtn.y=display.contentHeight-70
 	startBtn:setFillColor(0.9,0.9,0.9)
-	startBtn:addEventListener("tap",newPuzzle)
+	startBtn:addEventListener("tap",startPuzzle)
 	preStartMenuGroup:insert(startBtn)
 	
 	local startText=display.newText("Start",0,0,native.systemFont,30)
@@ -85,6 +86,52 @@ function initPreUI()
 
 end
 
+function initUI()
+	playingMenuGroup = display.newGroup()
+
+	local midW = display.contentCenterX
+
+	local newBtn=display.newRect(0,0,210,40)
+	newBtn.x=midW
+	newBtn.y=display.contentHeight-130
+	newBtn:setFillColor(0.9,0.9,0.9)
+	newBtn:addEventListener("tap",newPuzzle)
+	playingMenuGroup:insert(newBtn)
+	
+	local newText=display.newText("New Puzzle",0,0,native.systemFont,30)
+	newText.x=midW
+	newText.y=newBtn.y
+	newText:setTextColor(0,0,0)
+	playingMenuGroup:insert(newText)
+
+
+	local backBtn=display.newRect(0,0,210,40)
+	backBtn.x=midW
+	backBtn.y=display.contentHeight-70
+	backBtn:setFillColor(0.9,0.9,0.9)
+	backBtn:addEventListener("tap",back)
+	playingMenuGroup:insert(backBtn)
+	
+	local backText=display.newText("Back",0,0,native.systemFont,30)
+	backText.x=midW
+	backText.y=backBtn.y
+	backText:setTextColor(0,0,0)
+	playingMenuGroup:insert(backText)
+
+end
+
+function startPuzzle()
+	display.remove(preStartMenuGroup)
+	timer.performWithDelay(500,initUI)
+	newPuzzle()
+end
+
+function back()
+	display.remove(playingMenuGroup)
+	timer.performWithDelay(500,initPreUI)
+	initBoard()
+end
+
 function newTile(x,y)
 
 	local tileSize = 23
@@ -114,6 +161,10 @@ function newTile(x,y)
 		self.isGuide = true
 	end
 
+	tile.isDone = function(self)
+		return (not self.isSolution) or (self.isSolution and self.isTapped)
+	end
+
 	tile.setSolution = function(self, value)
 		self.isSolution = value
 	end
@@ -123,6 +174,7 @@ function newTile(x,y)
 		self.isTapped = false
 		self.isGuide = false
 		self.label.text = ""
+		self:setFillColor(1,1,1)
 	end
 
 	tile.dispose = function(self)
@@ -140,6 +192,7 @@ function newTile(x,y)
 					self:setFillColor(0.8,0.5,0.5)
 				end
 			end
+			check()
 		end
 	end
 	tile:addEventListener("tap",tile)
@@ -218,7 +271,6 @@ end
 
 function newPuzzle()
 	resetBoard()
-	display.remove(preStartMenuGroup)
 	isPlaying = true
 
 	grid = {}
@@ -276,26 +328,24 @@ function newPuzzle()
 	for x = 1, dimension do
 		local chunkCount = {0,0,0,0}
 		local thisChunk = 1
-		local inChunk = false
 		for y = 1, dimension do
 			if (grid[x][y]) then
-				inChunk = true
 				chunkCount[thisChunk] = chunkCount[thisChunk] + 1
 			else
-				if (inChunk) then
-					inChunk = not inChunk
+				if (chunkCount[thisChunk] ~= 0) then
 					thisChunk = thisChunk+1
 				end
 			end
 		end
-
-		if (chunkCount[thisChunk] == 4) then
+		-- print ("x "..x.." - "..chunkCount[1],chunkCount[2],chunkCount[3])
+		if (chunkCount[thisChunk] == 0) then
 			thisChunk = thisChunk - 1
 		end
-
-		for i = 3-(thisChunk-1), 1, -1 do
-			if (chunkCount[4-i] ~= 0) then
-				board[x+3][i]:setText(chunkCount[4-i])
+		
+		for i = 4-thisChunk, 3 do
+			local chunkInfo = chunkCount[(i-(4-thisChunk))+1]
+			if (chunkInfo ~= 0) then
+				board[x+3][i]:setText(chunkInfo)
 			end
 		end
 	end
@@ -303,44 +353,43 @@ function newPuzzle()
 	for y = 1, dimension do
 		local chunkCount = {0,0,0,0}
 		local thisChunk = 1
-		local inChunk = false
 		for x = 1, dimension do
 			if (grid[x][y]) then
-				inChunk = true
 				chunkCount[thisChunk] = chunkCount[thisChunk] + 1
 			else
-				if (inChunk) then
-					inChunk = not inChunk
+				if (chunkCount[thisChunk] ~= 0) then
 					thisChunk = thisChunk+1
 				end
 			end
 		end
-
-		if (chunkCount[thisChunk] == 4) then
+		-- print ("y "..y.." - "..chunkCount[1],chunkCount[2],chunkCount[3])
+		if (chunkCount[thisChunk] == 0) then
 			thisChunk = thisChunk - 1
 		end
-
-		for i = 3-(thisChunk-1), 1, -1 do
-			if (chunkCount[4-i] ~= 0) then
-				board[i][y+3]:setText(chunkCount[4-i])
+		
+		for i = 4-thisChunk, 3 do
+			local chunkInfo = chunkCount[(i-(4-thisChunk))+1]
+			if (chunkInfo ~= 0) then
+				board[i][y+3]:setText(chunkInfo)
 			end
 		end
 	end
 
 end
 
-function Check()
+function check()
 	local finish=true
-	for x=4,dimension+3 do
-		for y=4,dimension+3 do
-			if tapped[x][y]==false and grid[x][y]==1 then
+	for x=1,dimension do
+		for y=1,dimension do
+			if not (board[x+3][y+3]:isDone()) then
 				finish=false
+				-- print (x+3,y+3)
 			end
 		end
 	end
 	if finish==true then
-		-- print "DONE"
-		timer.performWithDelay(5000,New)
+		timer.performWithDelay(3000,initPreUI)
+		timer.performWithDelay(3000,initBoard)
 	end
 end
 
